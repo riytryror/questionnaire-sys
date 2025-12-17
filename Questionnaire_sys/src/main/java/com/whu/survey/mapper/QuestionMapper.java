@@ -9,4 +9,6 @@ public interface QuestionMapper {
 
     // 根据问卷ID查题目列表
     List<Question> selectBySurveyId(Integer surveyId);
+
+    int deleteBySurveyId(Integer id);
 }

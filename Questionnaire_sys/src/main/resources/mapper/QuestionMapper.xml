@@ -28,4 +28,8 @@
         SELECT * FROM t_question WHERE survey_id = #{surveyId} ORDER BY order_no ASC
     </select>
 
+    <delete id="deleteBySurveyId">
+        DELETE FROM t_question WHERE survey_id = #{surveyId}
+    </delete>
+
 </mapper>

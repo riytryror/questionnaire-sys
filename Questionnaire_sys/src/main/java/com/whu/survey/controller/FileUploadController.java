@@ -1,52 +1,62 @@
 package com.whu.survey.controller;
 
 import com.whu.survey.utils.Result;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.servlet.http.HttpServletRequest;
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/upload")
-@CrossOrigin
+@CrossOrigin // 配合之前的跨域设置
 public class FileUploadController {
 
-    @PostMapping("/audio")
-    public Result<String> upload(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
+    // 定义文件保存的物理路径 (建议写在 application.yml 里，这里为了演示直接写死)
+    // Windows 例子: "D:/survey_files/"
+    // Mac/Linux 例子: "/Users/yourname/survey_files/"
+    private static final String UPLOAD_DIR = "D:/survey_files/";
+
+    // 定义文件访问的基础 URL (对应 WebMvcConfig 里的映射)
+    private static final String BASE_URL = "http://localhost:8080/files/";
+
+    @PostMapping("/file")
+    public Result<String> upload(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
-            return Result.error("文件为空");
+            return Result.error("文件不能为空");
         }
 
         try {
-            // 1. 获取原始文件名和后缀
+            // 1. 获取原始文件名
             String originalFilename = file.getOriginalFilename();
+
+            // 2. 获取后缀名 (例如 .jpg, .mp3)
             String suffix = originalFilename.substring(originalFilename.lastIndexOf("."));
 
-            // 2. 生成新文件名 (防止重名)
-            String newFileName = UUID.randomUUID().toString() + suffix;
+            // 3. 生成唯一文件名 (防止同名覆盖)
+            String fileName = UUID.randomUUID().toString() + suffix;
 
-            // 3. 确定存储路径
-            // 这里为了简单，直接存到 webapp/uploads 目录下
-            String realPath = request.getSession().getServletContext().getRealPath("/uploads/");
-            File dir = new File(realPath);
+            // 4. 创建保存目录 (如果不存在)
+            File dir = new File(UPLOAD_DIR);
             if (!dir.exists()) {
                 dir.mkdirs();
             }
 
-            // 4. 保存文件
-            file.transferTo(new File(dir, newFileName));
+            // 5. 保存文件到硬盘
+            File dest = new File(UPLOAD_DIR + fileName);
+            file.transferTo(dest);
 
-            // 5. 返回访问 URL
-            // 返回的是相对路径，前端拼接 base URL
-            String fileUrl = "/uploads/" + newFileName;
+            // 6. 返回可访问的 URL
+            // 结果类似: http://localhost:8080/files/abcd-1234.jpg
+            String fileUrl = BASE_URL + fileName;
+
             return Result.success(fileUrl);
 
         } catch (IOException e) {
             e.printStackTrace();
-            return Result.error("上传失败");
+            return Result.error("上传失败: " + e.getMessage());
         }
     }
 }

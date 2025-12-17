@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.whu.survey.mapper.AnswerMapper">
+
+    <insert id="insertResponse" parameterType="com.whu.survey.entity.SurveyResponse"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO t_survey_response (survey_id, user_id, user_ip)
+        VALUES (#{surveyId}, #{userId}, #{userIp})
+    </insert>
+
+    <insert id="insertAnswerList" parameterType="java.util.List">
+        INSERT INTO t_answer (response_id, question_id, type, answer_value)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.responseId}, #{item.questionId}, #{item.type}, #{item.answerValue})
+        </foreach>
+    </insert>
+
+    <select id="selectByQuestionId" resultType="com.whu.survey.entity.Answer">
+        SELECT * FROM t_answer WHERE question_id = #{questionId}
+    </select>
+
+</mapper>
