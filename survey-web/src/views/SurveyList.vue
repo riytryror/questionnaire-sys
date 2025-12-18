@@ -1,4 +1,5 @@
 <template>
+
   <div class="list-container">
     <div class="header">
       <div class="left-title">
@@ -112,9 +113,7 @@ const fetchList = async () => {
 
 // 2. 跳转逻辑
 const toFill = (id) => {
-  // 打开新窗口让用户模拟填写
-  const url = router.resolve({ path: `/survey/${id}` }).href
-  window.open(url, '_blank')
+  router.push(`/survey/${id}`)
 }
 
 const toStats = (id) => {

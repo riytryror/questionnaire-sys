@@ -10,6 +10,10 @@ const service = axios.create({
 //相应拦截器
 service.interceptors.response.use(
     response => {
+        if (response.config.responseType === 'blob') {
+      return response.data
+    }
+
         const res = response.data;
         if (res.code === 200) {
             return res.data;

@@ -1,5 +1,6 @@
 package com.whu.survey.mapper;
 
+import com.whu.survey.controller.dto.AnswerExportDTO;
 import com.whu.survey.entity.Survey;
 
 import java.util.List;
@@ -13,4 +14,6 @@ public interface SurveyMapper {
 
     List<Survey> selectAll();
     int deleteById(Integer id);
+
+    List<AnswerExportDTO> selectExportData(Integer surveyId);
 }

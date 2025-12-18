@@ -19,4 +19,15 @@
         DELETE FROM t_survey WHERE id = #{id}
     </delete>
 
+    <select id="selectExportData" resultType="com.whu.survey.controller.dto.AnswerExportDTO">
+        SELECT
+        a.response_id,
+        a.question_id,
+        a.answer_value,
+        r.submit_time
+        FROM t_answer a
+        LEFT JOIN t_survey_response r ON a.response_id = r.id
+        WHERE r.survey_id = #{surveyId}
+        ORDER BY r.submit_time DESC, a.question_id ASC
+    </select>
 </mapper>

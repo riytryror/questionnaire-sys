@@ -14,10 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+
 
 @Service
 public class SurveyServiceImpl implements SurveyService {
@@ -89,10 +87,12 @@ public class SurveyServiceImpl implements SurveyService {
     //实现统计数据转换
     @Override
     public List<QuestionStatsDTO> getSurveyStats(Integer surveyId) {
-        // 1. 先查出该问卷下的所有题目
+        // 1. 查出该问卷下的所有题目
         List<Question> questions = questionMapper.selectBySurveyId(surveyId);
-
         List<QuestionStatsDTO> statsList = new ArrayList<>();
+
+        // 定义哪些类型属于“图表类”（客观题）
+        List<String> chartTypes = Arrays.asList("SINGLE", "MULTI", "DROPDOWN", "RATING", "RANK");
 
         for (Question q : questions) {
             QuestionStatsDTO dto = new QuestionStatsDTO();
@@ -103,30 +103,61 @@ public class SurveyServiceImpl implements SurveyService {
             // 2. 查出这道题的所有答案
             List<Answer> answers = answerMapper.selectByQuestionId(q.getId());
 
-            // 3. 根据类型分别处理
-            if ("AUDIO".equals(q.getType())) {
-                // 情况A：音频题 -> 直接把路径收集起来
-                for (Answer ans : answers) {
-                    // 防止空值
-                    if (ans.getAnswerValue() != null && !ans.getAnswerValue().isEmpty()) {
-                        dto.getAudioList().add(ans.getAnswerValue());
-                    }
-                }
-            } else if ("SINGLE".equals(q.getType())) {
-                // 情况B：单选题 -> 统计每个选项被选了多少次 (词频统计)
+            // 3. 根据类型分流处理
+
+            // A. 图表类题目 (单选、多选、下拉、评分) -> 统计数量
+            if (chartTypes.contains(q.getType())) {
                 Map<String, Integer> countMap = new HashMap<>();
+
                 for (Answer ans : answers) {
                     String val = ans.getAnswerValue();
-                    if (val != null) {
-                        countMap.put(val, countMap.getOrDefault(val, 0) + 1);
+                    if (val != null && !val.isEmpty()) {
+                        // 特殊处理多选题：如果存的是 "A,B,C"，建议拆分统计
+                        if ("MULTI".equals(q.getType())) {
+                            String[] options = val.split(","); // 简单按逗号拆分
+                            for (String opt : options) {
+                                String cleanOpt = opt.trim();
+                                countMap.put(cleanOpt, countMap.getOrDefault(cleanOpt, 0) + 1);
+                            }
+                        } else {
+                            // 单选、下拉等直接统计
+                            countMap.put(val, countMap.getOrDefault(val, 0) + 1);
+                        }
                     }
                 }
 
-                // 将 Map 转成 ECharts 需要的 List<OptionCount>
+                // 转成 DTO
                 for (Map.Entry<String, Integer> entry : countMap.entrySet()) {
                     dto.getChartData().add(
                             new QuestionStatsDTO.OptionCount(entry.getKey(), entry.getValue())
                     );
+                }
+            }
+
+            // B. 音频题 -> 存入 audioList
+            else if ("AUDIO".equals(q.getType())) {
+                for (Answer ans : answers) {
+                    if (ans.getAnswerValue() != null) {
+                        dto.getAudioList().add(ans.getAnswerValue());
+                    }
+                }
+            }
+
+            // C. 图片/签名题 -> 存入 imageList (解决你刚才的问题)
+            else if ("IMAGE".equals(q.getType()) || "SIGN".equals(q.getType())) {
+                for (Answer ans : answers) {
+                    if (ans.getAnswerValue() != null) {
+                        dto.getImageList().add(ans.getAnswerValue());
+                    }
+                }
+            }
+
+            // D. 其他所有类型 (填空 TEXT, 文件 FILE, 视频 VIDEO) -> 存入 textList
+            else {
+                for (Answer ans : answers) {
+                    if (ans.getAnswerValue() != null) {
+                        dto.getTextList().add(ans.getAnswerValue());
+                    }
                 }
             }
 
