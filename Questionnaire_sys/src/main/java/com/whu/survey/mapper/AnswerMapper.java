@@ -2,6 +2,8 @@ package com.whu.survey.mapper;
 
 import com.whu.survey.entity.Answer;
 import com.whu.survey.entity.SurveyResponse;
+import org.apache.ibatis.annotations.Select;
+
 import java.util.List;
 
 public interface AnswerMapper {
@@ -13,4 +15,7 @@ public interface AnswerMapper {
 
     // 通过ID查询所有答案，用于统计
     List<Answer> selectByQuestionId(Integer questionId);
+
+    @Select("SELECT COUNT(*) FROM t_survey_response WHERE survey_id = #{surveyId}")
+    int countResponseBySurveyId(Integer surveyId);
 }

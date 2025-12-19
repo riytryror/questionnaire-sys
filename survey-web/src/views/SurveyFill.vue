@@ -1,364 +1,430 @@
 <template>
-    <div class="page-header">
-      <el-button link @click="$router.push('/')">
-        <el-icon><ArrowLeft /></el-icon> 返回列表
-      </el-button>
+  <div class="fill-container" v-loading="loading">
+    <div v-if="survey" class="survey-header">
+      <div class="header-content">
+        <h1 class="title">{{ survey.title }}</h1>
+        <div class="description">{{ survey.description }}</div>
+      </div>
     </div>
 
-  <div class="main-container">
-    <div v-if="loading" class="loading-state">
-      <el-icon class="is-loading" size="30"><Loading /></el-icon>
-      <p>问卷加载中...</p>
+    <div v-if="errorMsg" class="error-box">
+      <el-empty :description="errorMsg">
+        <el-button type="primary" @click="$router.push('/')">返回首页</el-button>
+      </el-empty>
     </div>
 
-    <el-card v-else-if="survey" class="survey-card">
-      <template #header>
-        <div class="header-content">
-          <h1 class="survey-title">{{ survey.title }}</h1>
-          <p class="survey-desc">{{ survey.description }}</p>
+    <div v-else-if="survey" class="questions-list">
+      <div
+        v-for="(q, index) in survey.questions"
+        :key="q.id"
+        class="question-card"
+        v-show="checkLogic(q)"
+        :id="'q-' + q.id"
+      >
+        <div class="q-title">
+          <span class="q-index">{{ getRealIndex(index) }}.</span>
+          <span class="q-text">{{ q.title }}</span>
+          <span v-if="q.required" class="required">*</span>
+          <el-tag size="small" type="info" effect="plain" class="type-tag">
+            {{ getLabel(q.type) }}
+          </el-tag>
         </div>
-      </template>
 
-      <div v-for="(q, index) in survey.questions" :key="q.id" class="question-item">
-        <h3>
-          {{ index + 1 }}. {{ q.title }}
-          <span v-if="q.required" style="color: red">*</span>
-          <el-tag size="small" effect="plain" style="margin-left: 10px">{{
-            getLabel(q.type)
-          }}</el-tag>
-        </h3>
+        <div v-if="q.type === 'SINGLE'">
+          <el-radio-group v-model="answers[q.id]" class="vertical-options">
+            <el-radio
+              v-for="opt in q.config.options"
+              :key="opt"
+              :label="opt"
+              size="large"
+              border
+            >{{ opt }}</el-radio>
+          </el-radio-group>
+        </div>
 
-        <el-radio-group v-if="q.type === 'SINGLE'" v-model="answers[q.id]">
-          <el-radio
-            v-for="opt in q.config.options"
-            :key="opt"
-            :label="opt"
+        <div v-if="q.type === 'MULTI'">
+          <el-checkbox-group v-model="answers[q.id]" class="vertical-options">
+            <el-checkbox
+              v-for="opt in q.config.options"
+              :key="opt"
+              :label="opt"
+              size="large"
+              border
+            >{{ opt }}</el-checkbox>
+          </el-checkbox-group>
+        </div>
+
+        <div v-if="q.type === 'DROPDOWN'">
+          <el-select v-model="answers[q.id]" placeholder="请选择" style="width: 100%" size="large">
+            <el-option v-for="opt in q.config.options" :key="opt" :label="opt" :value="opt" />
+          </el-select>
+        </div>
+
+        <div v-if="q.type === 'TEXT'">
+          <el-input
+            v-model="answers[q.id]"
+            :type="q.config.maxLines > 1 ? 'textarea' : 'text'"
+            :rows="q.config.maxLines"
+            :placeholder="q.config.placeholder || '请输入您的回答'"
+          />
+        </div>
+
+        <div v-if="q.type === 'RATING'" class="rate-box">
+          <el-rate
+            v-model="answers[q.id]"
+            :max="q.config.max || 5"
+            allow-half
+            show-score
             size="large"
-            border
-            class="block-radio"
-            >{{ opt }}</el-radio
-          >
-        </el-radio-group>
+          />
+        </div>
 
-        <el-checkbox-group v-if="q.type === 'MULTI'" v-model="answers[q.id]">
-          <el-checkbox
-            v-for="opt in q.config.options"
-            :key="opt"
-            :label="opt"
+        <div v-if="q.type === 'DATE'">
+          <el-date-picker
+            v-model="answers[q.id]"
+            type="date"
+            placeholder="请选择日期"
+            style="width: 100%"
+            value-format="YYYY-MM-DD"
             size="large"
-            border
-            class="block-radio"
-            >{{ opt }}</el-checkbox
-          >
-        </el-checkbox-group>
-
-        <el-select
-          v-if="q.type === 'DROPDOWN'"
-          v-model="answers[q.id]"
-          placeholder="请选择"
-          size="large"
-          style="width: 100%"
-        >
-          <el-option v-for="opt in q.config.options" :key="opt" :label="opt" :value="opt" />
-        </el-select>
-
-        <el-rate
-          v-if="q.type === 'RATING'"
-          v-model="answers[q.id]"
-          :max="q.config.max || 5"
-          allow-half
-          show-score
-        />
-
-        <el-input
-          v-if="q.type === 'TEXT'"
-          v-model="answers[q.id]"
-          :type="q.config.maxLines > 1 ? 'textarea' : 'text'"
-          :rows="q.config.maxLines"
-          :placeholder="q.config.placeholder || '请输入您的回答'"
-        />
-
-        <el-date-picker
-          v-if="q.type === 'DATE'"
-          v-model="answers[q.id]"
-          type="date"
-          placeholder="选择日期"
-          format="YYYY-MM-DD"
-          value-format="YYYY-MM-DD"
-          style="width: 100%"
-        />
+          />
+        </div>
 
         <div v-if="q.type === 'RANK'">
-          <div v-for="opt in q.config.options" :key="opt" style="margin-bottom: 10px">
-            <span style="display: inline-block; width: 120px">{{ opt }}</span>
-            <el-input-number v-model="answers[q.id + '_' + opt]" :min="1" size="small" />
-            <span class="tip-text">(填写序号)</span>
+          <div v-for="opt in q.config.options" :key="opt" class="rank-item">
+            <span class="rank-label">{{ opt }}</span>
+            <el-input-number
+              v-model="answers[q.id + '_' + opt]"
+              :min="1"
+              :max="q.config.options.length"
+              size="small"
+              controls-position="right"
+            />
+            <span class="rank-suffix">位</span>
           </div>
         </div>
 
-        <div v-if="['FILE', 'IMAGE', 'VIDEO', 'AUDIO'].includes(q.type)">
+        <div v-if="['FILE', 'IMAGE', 'AUDIO', 'VIDEO'].includes(q.type)">
           <el-upload
-            action="/api/upload/file"
+            :action="uploadUrl"
+            :headers="uploadHeaders"
+            :accept="getAccept(q.type)"
             :show-file-list="false"
             :on-success="(res) => handleUploadSuccess(q.id, res)"
             :before-upload="(file) => beforeUpload(file, q.type)"
-            :accept="getAcceptType(q.type)"
             class="upload-demo"
           >
-            <el-button type="primary" plain>
-              <el-icon><Upload /></el-icon> 点击上传 {{ getLabel(q.type) }}
+            <el-button type="primary" plain icon="Upload">
+              点击上传{{ getLabel(q.type).replace('附件', '文件') }}
             </el-button>
           </el-upload>
 
-          <div v-if="answers[q.id]" class="preview-box">
-            <el-icon style="color: #67c23a"><Check /></el-icon>
-            已上传成功
-            <img
-              v-if="q.type === 'IMAGE'"
-              :src="'http://localhost:8080' + answers[q.id]"
-              class="preview-img"
-            />
+          <div v-if="answers[q.id]" class="file-preview">
+            <div class="preview-header">
+              <el-icon color="#67C23A"><CircleCheckFilled /></el-icon>
+              <span class="file-name">已上传成功</span>
+              <el-button link type="danger" size="small" @click="answers[q.id] = null">
+                删除
+              </el-button>
+            </div>
+
+            <img v-if="q.type === 'IMAGE'" :src="answers[q.id]" class="preview-img" />
+
             <audio
               v-if="q.type === 'AUDIO'"
               controls
-              :src="'http://localhost:8080' + answers[q.id]"
-              class="preview-audio"
+              :src="answers[q.id]"
+              class="preview-media"
             ></audio>
+
+            <video
+              v-if="q.type === 'VIDEO'"
+              controls
+              :src="answers[q.id]"
+              class="preview-media"
+            ></video>
+
+            <a
+              v-if="q.type === 'FILE'"
+              :href="answers[q.id]"
+              target="_blank"
+              class="file-link"
+            >查看文件</a>
           </div>
         </div>
 
         <div v-if="q.type === 'SIGN'">
-          <div class="sign-board">
+          <div class="sign-wrapper">
             <vue-esign
               :ref="(el) => setSignRef(el, q.id)"
               :width="800"
               :height="300"
               :isCrop="false"
-              :lineWidth="6"
-              lineColor="#000000"
-              bgColor="#ffffff"
+              :lineWidth="4"
+              lineColor="#000"
+              bgColor="#f9f9f9"
             />
           </div>
-          <div style="margin-top: 10px">
-            <el-button type="primary" size="small" @click="handleGenerateSign(q.id)"
-              >确认使用签名</el-button
-            >
+          <div class="sign-actions">
             <el-button size="small" @click="handleResetSign(q.id)">重写</el-button>
+            <el-button type="primary" size="small" @click="handleGenerateSign(q.id)">
+              确认签名
+            </el-button>
           </div>
-          <div v-if="answers[q.id]" style="margin-top: 10px; border: 1px dashed #ccc; padding: 5px">
-            <p style="font-size: 12px; color: #999">生成的签名预览：</p>
-            <img :src="answers[q.id]" style="max-width: 100%; height: auto" />
+          <div v-if="answers[q.id]" class="sign-preview">
+            <img :src="answers[q.id]" />
+            <div class="tip">签名已保存</div>
           </div>
         </div>
       </div>
 
-      <div class="footer">
+      <div class="footer-action">
         <el-button
           type="primary"
           size="large"
+          class="submit-btn"
           @click="submit"
           :loading="submitting"
-          style="width: 200px"
         >
           提交问卷
         </el-button>
       </div>
-    </el-card>
+    </div>
   </div>
-
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+// 请确保以下 API 路径正确
 import { getSurveyDetail, submitSurvey } from '@/api/survey'
-import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { Loading, Upload, Check } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Upload, CircleCheckFilled } from '@element-plus/icons-vue'
+import VueEsign from 'vue-esign' 
 
 const route = useRoute()
+const router = useRouter()
+
+// 状态变量
 const loading = ref(true)
 const submitting = ref(false)
+const errorMsg = ref('')
 const survey = ref(null)
-const answers = ref({})
-const signRefs = reactive({}) // 用于存储签名板实例的 Map
+const answers = ref({}) // 存放答案
+const signRefs = reactive({}) // 存放签名板实例
 
-// 1. 初始化数据
+// 配置上传接口
+const uploadUrl = '/api/upload/file'
+const uploadHeaders = {
+  Authorization: localStorage.getItem('token') || '' 
+}
+
+// 初始化
 onMounted(async () => {
+  const id = route.params.id
+  if (!id) {
+    errorMsg.value = '链接参数错误'
+    loading.value = false
+    return
+  }
+
   try {
-    const id = route.params.id
-    if (!id) return
-
-    const data = await getSurveyDetail(id)
-    survey.value = data
-
-    // 初始化答案对象
-    data.questions.forEach((q) => {
-      // ⚠️ 关键：多选题必须初始化为数组
-      if (q.type === 'MULTI') {
-        answers.value[q.id] = []
-      } else {
-        answers.value[q.id] = ''
-      }
-    })
+    const res = await getSurveyDetail(id)
+    const data = res.data || res
+    
+    if (data.status === 0) {
+      errorMsg.value = '该问卷已暂停回收'
+    } else {
+      survey.value = data
+      initAnswers(data.questions)
+    }
   } catch (e) {
     console.error(e)
-    ElMessage.error('问卷加载失败')
+    errorMsg.value = '问卷加载失败或不存在'
   } finally {
     loading.value = false
   }
 })
 
-// === 辅助逻辑 ===
+// 初始化答案结构
+const initAnswers = (questions) => {
+  questions.forEach((q) => {
+    if (q.type === 'MULTI') {
+      answers.value[q.id] = []
+    } else {
+      answers.value[q.id] = null
+    }
+  })
+}
 
-// 题型名称映射
+// 逻辑显隐判断
+const checkLogic = (q) => {
+  if (!q.logic || !q.logic.targetIndex) return true
+  const targetQ = survey.value.questions[q.logic.targetIndex]
+  if (!targetQ) return true
+  const targetVal = answers.value[targetQ.id]
+  return targetVal === q.logic.option
+}
+
+// 辅助显示真实题号
+const getRealIndex = (index) => index + 1
+
+// 辅助获取题目类型标签
 const getLabel = (type) => {
   const map = {
-    SINGLE: '单选题',
-    MULTI: '多选题',
-    DROPDOWN: '下拉框',
-    RATING: '评分题',
-    TEXT: '文本题',
-    DATE: '日期',
-    RANK: '排序题',
-    FILE: '文件',
-    IMAGE: '图片',
-    VIDEO: '视频',
-    AUDIO: '音频',
+    SINGLE: '单选', MULTI: '多选', TEXT: '填空',
+    DATE: '日期', RATING: '评分', RANK: '排序',
+    FILE: '附件', IMAGE: '图片', AUDIO: '音频', VIDEO: '视频',
     SIGN: '签名',
   }
-  return map[type] || '题目'
+  return map[type] || ''
 }
 
-// 限制文件类型
-const getAcceptType = (type) => {
+// 辅助获取上传文件类型限制
+const getAccept = (type) => {
   switch (type) {
-    case 'IMAGE':
-      return 'image/*' // 只允许图片
-    case 'AUDIO':
-      return 'audio/*' // 只允许音频
-    case 'VIDEO':
-      return 'video/*' // 只允许视频
-    case 'FILE':
-      return '*' // 允许所有
-    case 'SIGN':
-      return 'image/*' // 签名本质是图片
-    default:
-      return '*'
+    case 'IMAGE': return 'image/*'
+    case 'AUDIO': return 'audio/*'
+    case 'VIDEO': return 'video/*'
+    default: return '*'
   }
 }
 
-// 映射上传接口路径 (api/upload/audio, api/upload/image 等)
-const uploadTypeMap = (type) => {
-  if (['IMAGE', 'VIDEO', 'AUDIO'].includes(type)) return type.toLowerCase()
-  return 'file' // 默认走普通文件接口
-}
-
-// === 事件处理 ===
-
-// 上传成功回调
-const handleUploadSuccess = (qid, response) => {
-  if (response.code === 200) {
-    ElMessage.success('上传成功')
-    answers.value[qid] = response.data // 存入路径
-  } else {
-    ElMessage.error('上传失败: ' + response.msg)
-  }
-}
-
-// 上传前校验 (可选)
+// 上传前校验
 const beforeUpload = (file, type) => {
-  // 可以在这里限制大小，比如 10MB
+  // 大小限制 50MB
   const isLt50M = file.size / 1024 / 1024 < 50
   if (!isLt50M) {
     ElMessage.error('文件大小不能超过 50MB!')
+    return false
   }
-  return isLt50M
+
+  // 格式限制
+  if (type === 'IMAGE' && !file.type.startsWith('image/')) {
+    ElMessage.error('请上传图片格式文件')
+    return false
+  }
+  if (type === 'AUDIO' && !file.type.startsWith('audio/')) {
+    ElMessage.error('请上传音频格式文件')
+    return false
+  }
+  if (type === 'VIDEO' && !file.type.startsWith('video/')) {
+    ElMessage.error('请上传视频格式文件')
+    return false
+  }
+  
+  return true
 }
 
-// === 签名板逻辑 ===
+// 上传成功回调
+const handleUploadSuccess = (qid, res) => {
+  if (res.code === 200) {
+    // 后端返回的是 /uploads/xxxx，直接存入答案
+    answers.value[qid] = res.data 
+    ElMessage.success('上传成功')
+  } else {
+    ElMessage.error(res.msg || '上传失败')
+  }
+}
 
-// 动态收集 ref
+// 签名板相关方法
 const setSignRef = (el, qid) => {
-  if (el) {
-    signRefs[qid] = el
-  }
+  if (el) signRefs[qid] = el
 }
-
-// 生成签名图片
-const handleGenerateSign = (qid) => {
-  const esignInstance = signRefs[qid]
-  if (!esignInstance) return
-
-  esignInstance
-    .generate()
-    .then((res) => {
-      answers.value[qid] = res // res 是 Base64 字符串
-      ElMessage.success('签名已生成')
-    })
-    .catch((err) => {
-      ElMessage.warning('请先完成签名')
-    })
-}
-
-// 重置签名
 const handleResetSign = (qid) => {
-  const esignInstance = signRefs[qid]
-  if (esignInstance) {
-    esignInstance.reset()
-    answers.value[qid] = '' // 清空答案
-  }
+  signRefs[qid]?.reset()
+  answers.value[qid] = null
+}
+const handleGenerateSign = (qid) => {
+  signRefs[qid]?.generate().then((res) => {
+    answers.value[qid] = res
+    ElMessage.success('签名已确认')
+  }).catch(() => {
+    ElMessage.warning('请先书写签名')
+  })
 }
 
-// === 提交逻辑 ===
-
+// 3. 提交逻辑
 const submit = async () => {
-  console.log('提交前原始数据:', answers.value)
+  // A. 必填校验
+  for (const q of survey.value.questions) {
+    if (!checkLogic(q)) continue
+
+    if (q.required) {
+      let val = answers.value[q.id]
+      
+      // 排序题特殊校验
+      if (q.type === 'RANK') {
+         const hasValue = q.config.options.some(opt => answers.value[q.id + '_' + opt])
+         if (hasValue) val = 'valid'
+      }
+
+      if (val === null || val === undefined || val === '' || (Array.isArray(val) && val.length === 0)) {
+        ElMessage.warning(`第 ${getRealIndex(survey.value.questions.indexOf(q))} 题是必填项，请填写`)
+        document.getElementById('q-' + q.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        return
+      }
+    }
+  }
+
   submitting.value = true
 
   try {
-    const submitData = {
-      surveyId: survey.value.id,
-      answers: [],
-    }
+    // B. 数据组装
+    const submitList = []
 
-    // 遍历题目来构造答案，避免把 RANK 的临时 key (101_选项A) 当作题目ID
     survey.value.questions.forEach((q) => {
-      let finalValue = answers.value[q.id]
+      // 1. 隐藏题目不提交
+      if (!checkLogic(q)) return 
 
-      // 处理多选题：数组 -> 字符串
-      if (q.type === 'MULTI' && Array.isArray(finalValue)) {
-        finalValue = finalValue.join(',')
-      }
+      let finalVal = answers.value[q.id]
 
-      // 处理排序题：把散落在 answers 里的 key 聚合起来
-      // 格式变成: "选项A:1,选项B:2"
-      if (q.type === 'RANK') {
-        const rankArr = []
+      // 2. 格式转换
+      if (q.type === 'MULTI' && Array.isArray(finalVal)) {
+        finalVal = finalVal.join(',')
+      } 
+      else if (q.type === 'RANK') {
+        const arr = []
         q.config.options.forEach((opt) => {
-          const rankVal = answers.value[q.id + '_' + opt]
-          if (rankVal) rankArr.push(`${opt}:${rankVal}`)
+          const v = answers.value[q.id + '_' + opt]
+          if (v !== undefined && v !== null) {
+             arr.push(`${opt}:${v}`)
+          }
         })
-        finalValue = rankArr.join(',')
+        finalVal = arr.join(',')
       }
 
-      // 推入结果
-      submitData.answers.push({
-        questionId: q.id,
-        type: q.type,
-        value: finalValue ? String(finalValue) : '', // 确保转字符串
-      })
+      // 3. 加入提交列表
+      if (finalVal !== null && finalVal !== undefined && String(finalVal).trim() !== '') {
+        submitList.push({
+          questionId: q.id,
+          type: q.type,
+          value: String(finalVal) // ⭐ 修改点：这里改成了 value 以匹配后端 DTO
+        })
+      }
     })
 
-    console.log('最终构造的数据:', submitData)
+    console.log('📦 提交数据:', submitList)
 
-    await submitSurvey(submitData)
-    ElMessage.success('提交成功！')
+    if (submitList.length === 0) {
+        ElMessage.warning('没有填写任何有效内容')
+        submitting.value = false
+        return
+    }
 
-    setTimeout(() => {
-      location.reload()
-    }, 1500)
+    // C. 发送请求
+    await submitSurvey({
+      surveyId: survey.value.id,
+      answers: submitList,
+    })
+
+    ElMessageBox.alert('您的答卷已提交成功，感谢参与！', '提交成功', {
+      confirmButtonText: '关闭页面',
+      callback: () => router.push('/'),
+    })
   } catch (error) {
     console.error(error)
+    ElMessage.error(error.response?.data?.msg || '提交失败，请重试')
   } finally {
     submitting.value = false
   }
@@ -366,82 +432,162 @@ const submit = async () => {
 </script>
 
 <style scoped>
-.page-header {
-  max-width: 800px;
-  margin: 0 auto 20px; 
-}
-.main-container {
-  max-width: 800px;
-  margin: 20px auto;
-  padding: 0 10px;
-}
-.loading-state {
-  text-align: center;
-  padding: 50px;
-  color: #909399;
-}
-.survey-title {
-  text-align: center;
-  color: #303133;
-  margin-bottom: 10px;
-}
-.survey-desc {
-  text-align: center;
-  color: #606266;
-  margin-bottom: 30px;
-}
-.question-item {
-  margin-bottom: 30px;
-  padding: 20px;
-  border-radius: 8px;
-  background: #fff;
-  border: 1px solid #ebeef5;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
-}
-.question-item h3 {
-  margin-top: 0;
-  margin-bottom: 15px;
-  font-size: 16px;
-  color: #303133;
-}
-.block-radio {
-  width: 100%;
-  margin-left: 0 !important;
-  margin-bottom: 10px;
-}
-.upload-demo {
-  margin-bottom: 10px;
-}
-.preview-box {
-  margin-top: 10px;
-  padding: 10px;
-  background: #f0f9eb;
-  border-radius: 4px;
-  color: #67c23a;
-}
-.preview-img {
-  max-width: 200px;
-  display: block;
-  margin-top: 5px;
-  border-radius: 4px;
-}
-.preview-audio {
-  width: 100%;
-  margin-top: 5px;
-}
-.sign-board {
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  overflow: hidden;
-}
-.footer {
-  text-align: center;
-  margin-top: 40px;
+.fill-container {
+  max-width: 640px;
+  margin: 0 auto;
+  background-color: #f5f7fa;
+  min-height: 100vh;
   padding-bottom: 40px;
 }
-.tip-text {
-  color: #999;
+
+.survey-header {
+  background: #ffffff;
+  padding: 24px 20px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #eee;
+}
+.title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 10px 0;
+}
+.description {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.5;
+}
+
+.questions-list {
+  padding: 0 12px;
+}
+
+.question-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.q-title {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  color: #2c3e50;
+  line-height: 1.4;
+}
+.q-index {
+  font-weight: bold;
+  margin-right: 4px;
+}
+.required {
+  color: #f56c6c;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.type-tag {
+  margin-left: 8px;
+  vertical-align: middle;
+  transform: scale(0.9);
+}
+
+/* 选项样式 */
+.vertical-options .el-radio,
+.vertical-options .el-checkbox {
+  display: flex;
+  margin-right: 0;
+  margin-bottom: 10px;
+  width: 100%;
+  height: auto;
+  padding: 10px;
+  border-radius: 4px;
+  white-space: normal;
+}
+
+/* 排序题 */
+.rank-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  background: #f9f9f9;
+  padding: 8px;
+  border-radius: 4px;
+}
+.rank-label {
+  flex: 1;
+  font-size: 14px;
+}
+.rank-suffix {
+  margin-left: 8px;
   font-size: 12px;
-  margin-left: 5px;
+  color: #999;
+}
+
+/* 上传预览区域 */
+.file-preview {
+  margin-top: 15px;
+  background: #f0f9eb;
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid #e1f3d8;
+}
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: #67C23A;
+  font-size: 14px;
+}
+.preview-img {
+  max-width: 100%;
+  max-height: 200px;
+  display: block;
+  border-radius: 4px;
+}
+.preview-media {
+  width: 100%;
+  margin-top: 5px;
+}
+.file-link {
+  color: #409eff;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+/* 签名板 */
+.sign-wrapper {
+  border: 1px dashed #dcdfe6;
+  background: #f9f9f9;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.sign-actions {
+  text-align: right;
+}
+.sign-preview img {
+  max-width: 100%;
+  height: auto;
+  margin-top: 10px;
+  border: 1px solid #eee;
+}
+
+/* 底部操作 */
+.footer-action {
+  margin-top: 24px;
+  padding: 0 20px;
+}
+.submit-btn {
+  width: 100%;
+  font-weight: bold;
+  height: 44px;
+  font-size: 16px;
+}
+.error-box {
+  padding-top: 100px;
+  text-align: center;
 }
 </style>

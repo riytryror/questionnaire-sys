@@ -27,7 +27,13 @@ const router = createRouter({
       path: '/stats/:id',
       name: 'survey-stats',
       component: SurveyStats
-    }
+    },
+    {
+  path: '/fill/:id', 
+  name: 'SurveyFill',
+  component: () => import('@/views/SurveyFill.vue'),
+  meta: { title: '填写问卷' }
+}
   ]
 })
 

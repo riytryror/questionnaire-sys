@@ -2,134 +2,146 @@
   <div class="stats-container">
     <div class="header">
       <el-button @click="$router.push('/')" icon="ArrowLeft">返回列表</el-button>
-      <h2 class="page-title">📊 问卷数据统计</h2>
-      <el-button 
-    type="success" 
-    icon="Download" 
-    :loading="exporting" 
-    @click="handleExport"
-    style="margin-left: auto;" 
-  >
-    导出 Excel
-  </el-button>
+      <h2 class="page-title">问卷数据统计</h2>
+      <el-button
+        type="success"
+        icon="Download"
+        :loading="exporting"
+        @click="handleExport"
+        style="margin-left: auto"
+      >
+        导出 Excel
+      </el-button>
     </div>
 
     <div v-if="loading" class="loading-box">
       <el-icon class="is-loading" size="40" color="#409EFF"><Loading /></el-icon>
-      <p>数据疯狂分析中...</p>
+      <p>数据分析中...</p>
     </div>
 
     <div v-else-if="!statsList || statsList.length === 0" class="empty-box">
-       <el-empty description="暂无答卷数据" />
+      <el-empty description="暂无答卷数据" />
     </div>
 
     <div v-else v-for="(item, index) in statsList" :key="index" class="chart-card">
-      
       <div class="card-header">
         <h3>
-          <span class="q-seq">{{ index + 1 }}.</span> 
+          <span class="q-seq">{{ index + 1 }}.</span>
           {{ item.title }}
-          <el-tag effect="plain" round size="small" class="type-tag">{{ getLabel(item.type) }}</el-tag>
+          <el-tag effect="plain" round size="small" class="type-tag">{{
+            getLabel(item.type)
+          }}</el-tag>
         </h3>
+        <span class="sub-text">
+          样本: {{ isChartType(item.type) ? getChartTotal(item.chartData) : item.answers.length }}
+        </span>
       </div>
 
       <div v-if="isChartType(item.type)" class="chart-area">
-         <div :id="'chart-' + index" class="chart-box"></div>
+        <div :id="'chart-' + index" class="chart-box"></div>
       </div>
 
       <div v-else class="list-area">
-        
-        <el-alert 
-          v-if="!item.answers || item.answers.length === 0" 
-          title="暂无用户提交数据" 
-          type="info" 
-          :closable="false" 
+        <el-alert
+          v-if="!item.answers || item.answers.length === 0"
+          title="暂无数据"
+          type="warning"
+          :closable="false"
           show-icon
         />
 
-        <el-table 
-          v-else 
-          :data="item.answers.map(ans => ({ content: ans }))" 
-          border 
-          stripe 
+        <el-table
+          v-else
+          :data="item.answers.map((ans) => ({ content: ans }))"
+          border
+          stripe
           style="width: 100%"
+          height="300"
         >
-          <el-table-column type="index" label="#" width="50" align="center" />
-          
-          <el-table-column label="用户提交内容">
+          <el-table-column type="index" label="#" width="60" align="center" />
+
+          <el-table-column label="提交内容">
             <template #default="scope">
-              
-              <div v-if="item.type === 'AUDIO'" class="media-box">
-                <audio controls :src="scope.row.content"></audio>
+              <div v-if="['IMAGE', 'SIGN'].includes(item.type)" class="media-box">
+                <el-image
+                  style="width: 150px; height: 80px; border: 1px solid #eee; border-radius: 4px"
+                  :src="processUrl(scope.row.content)"
+                  :preview-src-list="[processUrl(scope.row.content)]"
+                  fit="contain"
+                  preview-teleported
+                >
+                  <template #error>
+                    <div class="image-error">
+                      <el-icon><Picture /></el-icon> 无法加载
+                    </div>
+                  </template>
+                </el-image>
+              </div>
+
+              <div v-else-if="item.type === 'AUDIO'" class="media-box">
+                <audio controls :src="processUrl(scope.row.content)"></audio>
               </div>
 
               <div v-else-if="item.type === 'VIDEO'" class="media-box">
-                <video controls :src="scope.row.content" style="max-width: 300px; max-height: 200px"></video>
-              </div>
-
-              <div v-else-if="['IMAGE', 'SIGN'].includes(item.type)" class="media-box">
-                <el-image 
-                  style="width: 100px; height: 100px; border-radius: 4px;"
-                  :src="scope.row.content"
-                  :preview-src-list="[scope.row.content]"
-                  fit="cover"
-                  preview-teleported
-                />
+                <video
+                  controls
+                  :src="processUrl(scope.row.content)"
+                  style="max-width: 300px; max-height: 200px"
+                ></video>
               </div>
 
               <div v-else-if="item.type === 'FILE'">
-                <el-link type="primary" :href="scope.row.content" target="_blank" :underline="false">
-                  <el-icon style="margin-right:4px"><Document /></el-icon> 点击下载文件
+                <el-link
+                  type="primary"
+                  :href="processUrl(scope.row.content)"
+                  target="_blank"
+                  :underline="false"
+                >
+                  <el-icon style="margin-right: 4px"><Document /></el-icon> 下载/查看文件
                 </el-link>
               </div>
 
               <div v-else class="text-content">
                 {{ scope.row.content }}
               </div>
-
             </template>
           </el-table-column>
-          
-          <el-table-column 
-            v-if="['AUDIO','VIDEO','IMAGE','FILE','SIGN'].includes(item.type)" 
-            label="操作" 
-            width="100" 
-            align="center"
-          >
-             <template #default="scope">
-                <el-link type="primary" :href="scope.row.content" target="_blank">
-                  <el-icon><Download /></el-icon> 下载
-                </el-link>
-             </template>
-          </el-table-column>
-
         </el-table>
       </div>
-
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue' // 引入 onBeforeUnmount
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import * as echarts from 'echarts'
-import { getSurveyStats } from '@/api/survey'
-import { Loading, Document, Download, ArrowLeft } from '@element-plus/icons-vue'
+import { getSurveyStats, exportSurveyExcel } from '@/api/survey'
+import { Loading, Document, Download, ArrowLeft, Picture } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 
 const route = useRoute()
 const loading = ref(true)
+const exporting = ref(false)
 const statsList = ref([])
-// 存放所有的 chart 实例，方便 resize 和销毁
-const chartInstances = [] 
+const chartInstances = []
 
-const BASE_URL = 'http://localhost:8080'
+const BASE_URL = ''
 
 const typeMap = {
-  'SINGLE': '单选题', 'MULTI': '多选题', 'DROPDOWN': '下拉框', 
-  'RATING': '打分题', 'TEXT': '填空题', 'AUDIO': '录音', 
-  'VIDEO': '视频', 'IMAGE': '图片', 'FILE': '文件', 'SIGN': '签名'
+  SINGLE: '单选题',
+  MULTI: '多选题',
+  DROPDOWN: '下拉框',
+  RATING: '打分题',
+  TEXT: '填空题',
+  AUDIO: '录音',
+  VIDEO: '视频',
+  IMAGE: '图片',
+  FILE: '文件',
+  SIGN: '签名',
+  RANK: '排序题',
 }
+
 const getLabel = (type) => typeMap[type] || '题目'
 const isChartType = (type) => ['SINGLE', 'MULTI', 'DROPDOWN', 'RATING', 'RANK'].includes(type)
 
@@ -139,155 +151,247 @@ onMounted(async () => {
 
   try {
     const res = await getSurveyStats(surveyId)
-    // 假设未解包，如果拦截器解包了请去掉 .data
-    const rawData = res.data || res 
+    const rawData = res.data || res
 
-    statsList.value = rawData.map(item => {
-      let rawList = []
+    statsList.value = rawData.map((item) => {
+      // 合并所有可能的列表数据
+      let combinedAnswers = [
+        ...(item.answers || []),
+        ...(item.textList || []),
+        ...(item.imageList || []),
+        ...(item.audioList || []),
+      ]
 
-      // ⭐⭐⭐ 核心修复：根据 Type 拿数据，而不是谁不为空拿谁 ⭐⭐⭐
-      if (item.type === 'AUDIO') {
-         rawList = item.audioList
-      } else if (item.type === 'IMAGE' || item.type === 'SIGN') {
-         rawList = item.imageList 
-      } else if (['TEXT', 'FILE', 'VIDEO'].includes(item.type)) {
-         rawList = item.textList
-      } else {
-         // 兜底：万一后端类型写错了，尝试合并所有非空列表
-         rawList = [...(item.audioList||[]), ...(item.imageList||[]), ...(item.textList||[])]
+      combinedAnswers = [...new Set(combinedAnswers)].filter((v) => v !== null && v !== '')
+
+      // 映射图表数据
+      let processedChartData = []
+      if (item.chartData && item.chartData.length > 0) {
+        processedChartData = item.chartData.map((d) => ({
+          name: d.name || '未知选项',
+          value: d.value !== undefined ? d.value : d.count !== undefined ? d.count : d.num || 0,
+        }))
       }
 
-      // 处理 URL
-      const processedAnswers = (rawList || []).map(content => {
-        if (content && typeof content === 'string' && content.startsWith('/')) {
-           return BASE_URL + content
-        }
-        return content
-      })
+      return {
+        ...item,
+        answers: combinedAnswers,
+        chartData: processedChartData,
+      }
+    })
 
-      return { ...item, answers: processedAnswers }
-    })
-    
-    nextTick(() => {
-      initCharts()
-      // 监听窗口变化，让图表自适应
-      window.addEventListener('resize', handleResize)
-    })
+    // 初始化图表
+    initCharts()
+    window.addEventListener('resize', handleResize)
   } catch (e) {
     console.error(e)
+    ElMessage.error('获取数据失败')
   } finally {
     loading.value = false
   }
 })
 
-// 销毁前移除监听，防止报错
+const processUrl = (url) => {
+  if (!url) return ''
+  if (url.startsWith('data:')) return url
+  if (typeof url === 'string' && url.startsWith('/uploads/')) {
+    return BASE_URL + url
+  }
+  return url
+}
+
+const getChartTotal = (data) => {
+  if (!data) return 0
+  return data.reduce((sum, item) => sum + (Number(item.value) || 0), 0)
+}
+
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
-  chartInstances.forEach(chart => chart.dispose())
+  chartInstances.forEach((chart) => chart.dispose())
 })
 
 const handleResize = () => {
-  chartInstances.forEach(chart => chart.resize())
+  chartInstances.forEach((chart) => chart.resize())
 }
 
 const initCharts = () => {
-  statsList.value.forEach((item, index) => {
-    if (isChartType(item.type)) {
-      const chartDom = document.getElementById('chart-' + index)
-      if (chartDom) {
-        if (echarts.getInstanceByDom(chartDom)) {
-           echarts.dispose(chartDom)
-        }
-        const myChart = echarts.init(chartDom)
-        chartInstances.push(myChart) // 存起来
+  // 延迟执行确保DOM渲染
+  setTimeout(() => {
+    statsList.value.forEach((item, index) => {
+      if (!isChartType(item.type)) return
 
-        const validData = (item.chartData || []).filter(d => d.name)
-        
-        const option = {
-          tooltip: { trigger: 'item' },
-          legend: { bottom: '0%' },
-          series: [
-            {
-              name: '选择人数',
-              type: 'pie',
-              radius: ['40%', '70%'],
-              avoidLabelOverlap: false,
-              itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-              data: validData.length > 0 ? validData : [{name:'暂无数据', value:0}]
-            }
-          ]
-        }
-        myChart.setOption(option)
+      const domId = 'chart-' + index
+      const chartDom = document.getElementById(domId)
+
+      if (!chartDom) return
+
+      if (echarts.getInstanceByDom(chartDom)) {
+        echarts.dispose(chartDom)
       }
-    }
-  })
+
+      const myChart = echarts.init(chartDom)
+      chartInstances.push(myChart)
+
+      const validData = (item.chartData || []).map((d) => ({
+        name: d.name,
+        value: Number(d.value),
+      }))
+
+      const hasData = validData.length > 0 && validData.some((d) => d.value > 0)
+
+      const option = {
+        title: {
+          show: !hasData,
+          text: '暂无数据',
+          left: 'center',
+          top: 'center',
+          textStyle: { color: '#999' },
+        },
+        tooltip: {
+          trigger: 'item',
+          formatter: '{b}: {c}人 ({d}%)',
+        },
+        legend: {
+          bottom: '0%',
+          left: 'center',
+        },
+        series: [
+          {
+            name: '数据分布',
+            type: 'pie',
+            radius: ['40%', '70%'],
+            avoidLabelOverlap: true,
+            itemStyle: {
+              borderRadius: 10,
+              borderColor: '#fff',
+              borderWidth: 2,
+            },
+            label: {
+              show: true,
+              formatter: '{b}: {c}',
+            },
+            data: hasData ? validData : [],
+          },
+        ],
+      }
+
+      myChart.setOption(option)
+    })
+  }, 300)
 }
 
-
-import { exportSurveyExcel } from '@/api/survey' // 记得导入刚才写的接口
-import { ElMessage } from 'element-plus'
-
-// 定义加载状态
-const exporting = ref(false)
-
-// 导出处理函数
 const handleExport = async () => {
   const surveyId = route.params.id
-  exporting.value = true // 开启加载转圈圈
-
+  exporting.value = true
   try {
-    // 1. 发起请求
     const res = await exportSurveyExcel(surveyId)
-    
-    // ⚠️ 注意：有些封装的 request.js 拦截器会直接返回 res.data
-    // 如果下载下来的文件打不开，尝试改成: const blob = new Blob([res.data]) 
-    // 这里假设 res 就是返回的 blob 对象
-    const blob = new Blob([res], { 
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    const blob = new Blob([res], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     })
-
-    // 2. 创建一个临时的下载链接
-    const downloadLink = document.createElement('a')
-    const href = window.URL.createObjectURL(blob) // 创建 Blob URL
-    downloadLink.href = href
-    
-    // 3. 设置文件名 (你可以自定义，也可以尝试从响应头读取)
-    downloadLink.download = `问卷数据_${surveyId}_${new Date().getTime()}.xlsx`
-    
-    // 4. 触发点击，开始下载
-    document.body.appendChild(downloadLink)
-    downloadLink.click()
-    
-    // 5. 清理垃圾
-    document.body.removeChild(downloadLink)
-    window.URL.revokeObjectURL(href)
-    
-    ElMessage.success('导出成功！请查看下载目录')
-
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `问卷数据_${surveyId}.xlsx`
+    link.click()
+    window.URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
   } catch (e) {
-    console.error('导出失败', e)
-    ElMessage.error('导出失败，请稍后重试')
+    ElMessage.error('导出失败')
   } finally {
-    exporting.value = false // 关闭加载
+    exporting.value = false
   }
 }
 </script>
 
 <style scoped>
-.stats-container { max-width: 1000px; margin: 40px auto; padding: 0 20px; }
-.header { display: flex; align-items: center; gap: 20px; margin-bottom: 30px; }
-.page-title { margin: 0; }
-.loading-box { text-align: center; margin-top: 100px; color: #909399; }
-.empty-box { background: white; padding: 40px; border-radius: 8px; }
+.stats-container {
+  max-width: 1000px;
+  margin: 40px auto;
+  padding: 0 20px;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  color: #303133;
+}
+.loading-box {
+  text-align: center;
+  margin-top: 100px;
+  color: #909399;
+}
+.empty-box {
+  background: white;
+  padding: 40px;
+  border-radius: 8px;
+  text-align: center;
+}
 
-.chart-card { background: #fff; border-radius: 8px; padding: 25px; margin-bottom: 25px; box-shadow: 0 2px 12px 0 rgba(0,0,0,0.05); }
-.card-header { margin-bottom: 20px; border-left: 4px solid #409EFF; padding-left: 15px; }
-.q-seq { color: #409EFF; font-weight: bold; margin-right: 5px; }
-.type-tag { margin-left: 10px; vertical-align: middle; }
+.chart-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 25px;
+  margin-bottom: 25px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+}
+.card-header {
+  margin-bottom: 20px;
+  border-left: 4px solid #409eff;
+  padding-left: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.q-seq {
+  color: #409eff;
+  font-weight: bold;
+  margin-right: 5px;
+}
+.type-tag {
+  margin-left: 10px;
+  vertical-align: middle;
+}
+.sub-text {
+  font-size: 12px;
+  color: #909399;
+}
 
-.chart-area { display: flex; justify-content: center; }
-.chart-box { width: 100%; height: 300px; }
+.chart-area {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 20px 0;
+}
 
-.media-box audio { height: 40px; }
-.text-content { white-space: pre-wrap; line-height: 1.6; }
+.chart-box {
+  width: 100%;
+  min-width: 300px;
+  height: 350px;
+}
+
+.media-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fafafa;
+  padding: 10px;
+  border-radius: 4px;
+}
+.image-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #909399;
+  font-size: 12px;
+}
+.text-content {
+  white-space: pre-wrap;
+  line-height: 1.6;
+  color: #606266;
+}
 </style>

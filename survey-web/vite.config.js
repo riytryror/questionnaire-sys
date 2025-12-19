@@ -20,7 +20,10 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080', // 你的后端地址
         changeOrigin: true,
-        // rewrite: (path) => path.replace(/^\/api/, '') 
+      },
+      '/uploads': {
+        target: 'http://localhost:8080', // 你的后端地址
+        changeOrigin: true,
       }
     }
   }

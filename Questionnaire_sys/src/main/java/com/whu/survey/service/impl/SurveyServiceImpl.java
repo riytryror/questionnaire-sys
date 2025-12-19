@@ -61,6 +61,38 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     @Transactional // 开启事务，保证原子性
     public void submitSurvey(SurveySubmitDTO dto) {
+            // 1. 查出问卷配置
+            Survey survey = surveyMapper.selectById(dto.getSurveyId());
+            if (survey == null) {
+                throw new RuntimeException("问卷不存在");
+            }
+
+            // 2. 校验状态
+            if (survey.getStatus() != null && survey.getStatus() == 0) {
+                throw new RuntimeException("问卷已暂停回收");
+            }
+
+            Date now = new Date();
+
+            // 3. 校验开始时间
+            if (survey.getStartTime() != null && now.before(survey.getStartTime())) {
+                throw new RuntimeException("问卷尚未开始");
+            }
+
+            // 4. 校验结束时间
+            if (survey.getEndTime() != null && now.after(survey.getEndTime())) {
+                throw new RuntimeException("问卷已结束");
+            }
+
+            // 5. 校验回收配额 (需要查一下当前已收多少份)
+            if (survey.getMaxLimit() != null && survey.getMaxLimit() > 0) {
+                // 你需要在 AnswerMapper 加一个 countBySurveyId 方法
+                int currentCount = answerMapper.countResponseBySurveyId(dto.getSurveyId());
+                if (currentCount >= survey.getMaxLimit()) {
+                    throw new RuntimeException("问卷回收数量已达上限");
+                }
+            }
+
         // 1. 先保存答卷记录
         SurveyResponse response = new SurveyResponse();
         response.setSurveyId(dto.getSurveyId());
